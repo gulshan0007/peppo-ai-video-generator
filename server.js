@@ -10,29 +10,40 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security middleware
-app.use(helmet());
+// Enhanced security middleware for production
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable strict CSP for HTTP
+  crossOriginEmbedderPolicy: false, // Disable for HTTP
+  crossOriginOpenerPolicy: false, // Disable for HTTP
+  crossOriginResourcePolicy: false, // Disable for HTTP
+  originAgentCluster: false // Disable for HTTP
+}));
+
 app.use(compression());
 
-// Rate limiting
+// Stricter rate limiting for production
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  max: 50, // limit each IP to 50 requests per windowMs (reduced for production)
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use('/api/', limiter);
 
-// CORS configuration
+// CORS configuration for production
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-app-name.onrender.com'] // Update with your actual domain
+    ? ['http://34.229.176.75:5000', 'http://34.229.176.75'] // Updated with your actual EC2 IP
     : ['http://localhost:3000'],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing middleware with stricter limits
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Serve static files from Vite build
 app.use(express.static('client/build'));
@@ -42,7 +53,9 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Peppo AI Video Generator API is running',
-    timestamp: new Date().toISOString()
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
