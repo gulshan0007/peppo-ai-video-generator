@@ -17,6 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: true,
+    base: './', // Use relative paths
     rollupOptions: {
       output: {
         manualChunks: {
