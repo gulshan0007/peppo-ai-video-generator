@@ -16,8 +16,8 @@ sudo npm install -g pm2
 mkdir -p ~/peppo-ai
 cd ~/peppo-ai
 
-# Clone your repo (REPLACE with your actual GitHub username and repo name)
-git clone https://github.com/YOUR_GITHUB_USERNAME/peppo-ai-video-generator.git .
+# Clone your repo (Updated with your actual GitHub username)
+git clone https://github.com/gulshan0007/peppo-ai-video-generator.git .
 
 # Install dependencies
 npm install

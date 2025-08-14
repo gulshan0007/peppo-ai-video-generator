@@ -35,9 +35,9 @@ sudo chown ec2-user:ec2-user /var/www/peppo-ai
 # Navigate to app directory
 cd /var/www/peppo-ai
 
-# Clone your repository (REPLACE with your actual GitHub username and repo name)
+# Clone your repository (Updated with your actual GitHub username)
 echo "📥 Cloning repository..."
-git clone https://github.com/YOUR_GITHUB_USERNAME/peppo-ai-video-generator.git .
+git clone https://github.com/gulshan0007/peppo-ai-video-generator.git .
 
 # Install dependencies
 echo "📦 Installing dependencies..."

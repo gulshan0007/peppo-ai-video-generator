@@ -12,16 +12,11 @@ const PORT = process.env.PORT || 5000;
 
 // Enhanced security middleware for production
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      mediaSrc: ["'self'", "https:"],
-      connectSrc: ["'self'", "https://api.replicate.com"]
-    }
-  }
+  contentSecurityPolicy: false, // Disable strict CSP for HTTP
+  crossOriginEmbedderPolicy: false, // Disable for HTTP
+  crossOriginOpenerPolicy: false, // Disable for HTTP
+  crossOriginResourcePolicy: false, // Disable for HTTP
+  originAgentCluster: false // Disable for HTTP
 }));
 
 app.use(compression());
@@ -39,7 +34,7 @@ app.use('/api/', limiter);
 // CORS configuration for production
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['http://your-ec2-public-ip', 'https://your-domain.com'] // Update with your actual domain
+    ? ['http://34.229.176.75:5000', 'http://34.229.176.75'] // Updated with your actual EC2 IP
     : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST'],
