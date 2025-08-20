@@ -63,8 +63,8 @@ cd ..
 
 ### **3. Set Up Environment Variables**
 ```bash
-# Copy the example environment file
-cp env.example .env
+# Create a .env file in the root directory
+touch .env
 
 # Edit the .env file with your API key
 nano .env
@@ -74,15 +74,17 @@ nano .env
 ```env
 NODE_ENV=development
 PORT=5000
-REPLICATE_API_KEY=your_replicate_api_key_here
+REPLICATE_API_TOKEN=your_replicate_api_token_here
 ```
 
-### **4. Get Your Replicate API Key**
+**Note**: You can also use `REPLICATE_API_KEY` for backward compatibility.
+
+### **4. Get Your Replicate API Token**
 1. Visit [replicate.com](https://replicate.com)
 2. Sign up for a free account
 3. Go to your [API tokens page](https://replicate.com/account/api-tokens)
 4. Create a new API token
-5. Copy the token to your `.env` file
+5. Copy the token to your `.env` file as `REPLICATE_API_TOKEN`
 
 ### **5. Run the Application**
 

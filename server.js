@@ -3,12 +3,17 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const axios = require('axios');
+const Replicate = require('replicate');
 require('dotenv').config();
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Initialize Replicate client
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY,
+});
 
 // Enhanced security middleware for production
 app.use(helmet({
@@ -60,6 +65,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // AI Video Generation endpoint
+// Updated video generation endpoint with proper text-to-video models
 app.post('/api/generate-video', async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -79,79 +85,163 @@ app.post('/api/generate-video', async (req, res) => {
     console.log(`Generating video for prompt: "${prompt}"`);
 
     // Check if we have a Replicate API key
-    if (process.env.REPLICATE_API_KEY && process.env.REPLICATE_API_KEY !== 'your_replicate_api_key_here') {
+    if ((process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY) && 
+        (process.env.REPLICATE_API_TOKEN !== 'your_replicate_api_token_here' && 
+         process.env.REPLICATE_API_KEY !== 'your_replicate_api_key_here')) {
       try {
         console.log('Using Replicate API for real text-to-video generation...');
         
-        // Replicate API call for text-to-video generation
-        const replicateResponse = await axios.post('https://api.replicate.com/v1/predictions', {
-          version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
-          input: {
-            prompt: prompt,
-            video_length: "5",
-            fps: 8,
-            height: 576,
-            width: 1024,
-            num_frames: 40,
-            guidance_scale: 12.5,
-            negative_prompt: "low quality, blurry, distorted, deformed, watermark, text, ugly, bad anatomy"
-          }
-        }, {
-          headers: {
-            'Authorization': `Token ${process.env.REPLICATE_API_KEY}`,
-            'Content-Type': 'application/json'
+        // Try different text-to-video models in order of preference
+        const videoModels = [
+          {
+            name: "Luma Ray",
+            version: "luma/ray",
+            input: {
+              prompt: prompt,
+              negative_prompt: "low quality, blurry, distorted, deformed, watermark, text, ugly, bad anatomy, poor quality, low resolution",
+              width: 1024,
+              height: 576,
+              num_frames: 24,
+              fps: 8,
+              guidance_scale: 7.5,
+              num_inference_steps: 50
+            }
           },
-          timeout: 60000 // 1 minute timeout for prediction creation
-        });
-        
-        if (replicateResponse.data && replicateResponse.data.id) {
-          console.log('Replicate video generation started successfully');
-          console.log('Prediction ID:', replicateResponse.data.id);
-          
-          // For now, return success with a message about the prediction
-          // In production, you'd poll the prediction status and return the video URL
-          return res.json({
-            success: true,
-            videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', // Demo video for now
-            prompt: prompt,
-            duration: '5 seconds',
-            message: 'AI video generation started! This may take a few minutes. Check the console for prediction ID.',
-            source: 'replicate',
-            predictionId: replicateResponse.data.id,
-            status: 'generation-started'
-          });
-        } else {
-          console.log('Replicate response missing prediction ID, falling back to demo mode');
-          console.log('Response data:', replicateResponse.data);
+          {
+            name: "Stable Video Diffusion",
+            version: "stability-ai/stable-video-diffusion",
+            input: {
+              prompt: prompt,
+              negative_prompt: "low quality, blurry, distorted, deformed, watermark, text, ugly, bad anatomy, poor quality, low resolution",
+              motion_bucket_id: 127,
+              fps: 6,
+              width: 1024,
+              height: 576,
+              seed: Math.floor(Math.random() * 1000000),
+            }
+          },
+          {
+            name: "AnimateDiff Lightning",
+            version: "guoyww/animatediff",
+            input: {
+              prompt: prompt,
+              negative_prompt: "low quality, blurry, distorted, deformed, watermark, text, ugly, bad anatomy, poor quality, low resolution",
+              width: 512,
+              height: 512,
+              num_frames: 16,
+              num_inference_steps: 8,
+              guidance_scale: 1.2,
+              fps: 8
+            }
+          }
+        ];
+
+        let videoGenerated = false;
+        let lastError = null;
+
+        // Try each model until one works
+        for (const model of videoModels) {
+          try {
+            console.log(`Trying ${model.name}...`);
+            
+            console.log(`Running ${model.name}...`);
+            
+            try {
+              const output = await replicate.run(model.version, { input: model.input });
+              
+                             console.log(`✅ ${model.name} generated video successfully`);
+               console.log('Output:', output); // Debug log
+               
+               // Handle different output formats from Replicate
+               let videoUrl = null;
+               if (output && typeof output === 'string') {
+                 videoUrl = output;
+               } else if (output && output.url) {
+                 videoUrl = output.url();
+               } else if (output && Array.isArray(output) && output.length > 0) {
+                 videoUrl = output[0];
+               }
+               
+               if (videoUrl) {
+                 console.log('Final video URL:', videoUrl);
+                 videoGenerated = true;
+                 return res.json({
+                   success: true,
+                   videoUrl: videoUrl,
+                   prompt: prompt,
+                   duration: '5-10 seconds',
+                   message: 'AI video generated successfully!',
+                   source: 'replicate',
+                   model: model.name,
+                   status: 'generated-successfully'
+                 });
+               } else {
+                 console.log(`⚠️ ${model.name} generated unexpected output format:`, output);
+                 lastError = `${model.name} generated unexpected output format`;
+                 continue;
+               }
+            } catch (runError) {
+              console.error(`${model.name} run error:`, runError.message);
+              lastError = runError;
+              continue;
+            }
+          } catch (modelError) {
+            console.error(`${model.name} error:`, modelError.message);
+            lastError = modelError;
+            continue;
+          }
         }
+
+        // If no model worked, fall back to demo mode
+        if (!videoGenerated) {
+          console.log('All video models failed, falling back to demo mode');
+          throw new Error(`All video generation models failed. Last error: ${lastError?.message || 'Unknown error'}`);
+        }
+
       } catch (replicateError) {
         console.error('Replicate API error:', replicateError.message);
-        if (replicateError.response) {
-          console.error('Response status:', replicateError.response.status);
-          console.error('Response data:', replicateError.response.data);
-        }
         console.log('Falling back to demo mode...');
+        
+        // Fall through to demo mode instead of returning error immediately
       }
     } else {
       console.log('No valid Replicate API key found, using demo mode');
     }
 
-    // Fallback to demo mode (mock response)
+    // Enhanced demo mode with better video selection
     console.log('Using demo mode with sample video');
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Demo response - replace with actual API integration
-    const demoVideoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const demoVideos = [
+      {
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        description: 'Animated short film'
+      },
+      {
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        description: 'Action sequence'
+      },
+      {
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        description: 'Adventure scene'
+      },
+      {
+        url: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
+        description: 'Nature footage'
+      }
+    ];
     
+    const randomVideo = demoVideos[Math.floor(Math.random() * demoVideos.length)];
+
     res.json({
       success: true,
-      videoUrl: demoVideoUrl,
+      videoUrl: randomVideo.url,
       prompt: prompt,
-      duration: '5 seconds',
+      duration: '5-10 seconds',
       message: 'Video generated successfully! (Demo mode - using sample video)',
-      source: 'demo'
+      source: 'demo',
+      status: 'generated-successfully',
+      description: randomVideo.description
     });
 
   } catch (error) {
@@ -162,6 +252,7 @@ app.post('/api/generate-video', async (req, res) => {
     });
   }
 });
+
 
 // Catch-all handler for React app
 app.get('*', (req, res) => {
@@ -183,7 +274,9 @@ app.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
   
   // Check API key status
-  if (process.env.REPLICATE_API_KEY && process.env.REPLICATE_API_KEY !== 'your_replicate_api_key_here') {
+  if ((process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY) && 
+      (process.env.REPLICATE_API_TOKEN !== 'your_replicate_api_token_here' && 
+       process.env.REPLICATE_API_KEY !== 'your_replicate_api_key_here')) {
     console.log(`✅ Replicate API key configured`);
   } else {
     console.log(`⚠️  Replicate API key not configured - using demo mode`);

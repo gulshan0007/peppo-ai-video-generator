@@ -24,8 +24,11 @@ function App() {
     try {
       const response = await axios.post('/api/generate-video', { prompt });
       
+      console.log('API Response:', response.data); // Debug log
+      
       if (response.data.success) {
         setGeneratedVideo(response.data);
+        console.log('Video URL:', response.data.videoUrl); // Debug log
       } else {
         setError('Failed to generate video. Please try again.');
       }
@@ -160,10 +163,15 @@ function App() {
                   muted
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
+                  onError={(e) => console.error('Video error:', e)}
+                  onLoadStart={() => console.log('Video loading started')}
+                  onLoadedData={() => console.log('Video data loaded')}
+                  onCanPlay={() => console.log('Video can play')}
                 >
                   <source src={generatedVideo.videoUrl} type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
+                <p className="video-debug">Video URL: {generatedVideo.videoUrl}</p>
               </div>
 
               <div className="video-info">
