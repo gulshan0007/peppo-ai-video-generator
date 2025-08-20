@@ -294,11 +294,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Framer Motion** for smooth animations
 - **AWS** for cloud infrastructure
 
-## 📞 **Support**
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/gulshan0007/peppo-ai-video-generator/issues)
-- **Email**: [Your email here]
-- **Documentation**: [Your docs URL here]
 
 ---
 
